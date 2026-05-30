@@ -1,0 +1,43 @@
+{
+  "base_dir": {
+    "description": "下载产物保存目录；留空时使用 AstrBot data/jm_downloads",
+    "type": "string",
+    "default": ""
+  },
+  "client_impl": {
+    "description": "jmcomic 客户端实现",
+    "type": "string",
+    "default": "html",
+    "options": ["html", "api"]
+  },
+  "domain": {
+    "description": "JM 访问域名",
+    "type": "string",
+    "default": "18comic.vip"
+  },
+  "proxy": {
+    "description": "代理地址；system/none/空 表示不显式配置代理",
+    "type": "string",
+    "default": "system"
+  },
+  "avs_cookie": {
+    "description": "可选 AVS Cookie",
+    "type": "string",
+    "default": ""
+  },
+  "image_threads": {
+    "description": "图片下载线程数",
+    "type": "int",
+    "default": 8
+  },
+  "cleanup_images": {
+    "description": "生成 PDF 后清理图片目录",
+    "type": "bool",
+    "default": true
+  },
+  "keep_zip": {
+    "description": "发送后保留 zip 文件",
+    "type": "bool",
+    "default": true
+  }
+}

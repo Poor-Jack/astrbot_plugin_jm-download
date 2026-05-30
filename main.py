@@ -1,24 +1,130 @@
-from astrbot.api.event import filter, AstrMessageEvent, MessageEventResult
+from __future__ import annotations
+
+import asyncio
+from pathlib import Path
+from typing import Any
+
+from astrbot.api import AstrBotConfig, logger
+from astrbot.api.event import AstrMessageEvent, MessageChain, filter
+from astrbot.api.message_components import File
 from astrbot.api.star import Context, Star, register
-from astrbot.api import logger
+from astrbot.core.utils.astrbot_path import get_astrbot_data_path
 
-@register("helloworld", "YourName", "一个简单的 Hello World 插件", "1.0.0")
-class MyPlugin(Star):
-    def __init__(self, context: Context):
+try:
+    from .jm_download_core import (
+        FORMAT_ERROR,
+        JMDownloadConfig,
+        JMDownloadResult,
+        cleanup_zip,
+        download_album_as_zip,
+        parse_jm_command,
+    )
+except ImportError:
+    from jm_download_core import (
+        FORMAT_ERROR,
+        JMDownloadConfig,
+        JMDownloadResult,
+        cleanup_zip,
+        download_album_as_zip,
+        parse_jm_command,
+    )
+
+
+@register(
+    "astrbot_plugin_jm_download",
+    "poorjack",
+    "通过 /jm [num] 下载 JM album 并发送加密 zip",
+    "1.0.0",
+)
+class JMDownloadPlugin(Star):
+    def __init__(self, context: Context, config: AstrBotConfig | None = None):
         super().__init__(context)
+        self.config = config or {}
 
-    async def initialize(self):
-        """可选择实现异步的插件初始化方法，当实例化该插件类之后会自动调用该方法。"""
+    @filter.command("jm")
+    async def jm(self, event: AstrMessageEvent):
+        """下载 JM album，并以同编号密码打包 zip 发送。"""
+        album_id, error = parse_jm_command(event.message_str)
+        if error is not None or album_id is None:
+            yield event.plain_result(FORMAT_ERROR)
+            return
 
-    # 注册指令的装饰器。指令名为 helloworld。注册成功后，发送 `/helloworld` 就会触发这个指令，并回复 `你好, {user_name}!`
-    @filter.command("helloworld")
-    async def helloworld(self, event: AstrMessageEvent):
-        """这是一个 hello world 指令""" # 这是 handler 的描述，将会被解析方便用户了解插件内容。建议填写。
-        user_name = event.get_sender_name()
-        message_str = event.message_str # 用户发的纯文本消息字符串
-        message_chain = event.get_messages() # 用户所发的消息的消息链 # from astrbot.api.message_components import *
-        logger.info(message_chain)
-        yield event.plain_result(f"Hello, {user_name}, 你发了 {message_str}!") # 发送一条纯文本消息
+        yield event.plain_result(f"开始下载 JM {album_id}，请稍候。")
+
+        try:
+            result = await asyncio.to_thread(
+                download_album_as_zip,
+                album_id,
+                self._build_config(),
+            )
+        except Exception as exc:
+            logger.exception("JM 下载失败: %s", album_id)
+            yield event.plain_result(f"下载失败，编号：{album_id}，原因：{_summarize_error(exc)}")
+            return
+
+        page_text = str(result.page_count) if result.page_count is not None else "未知"
+        yield event.plain_result(
+            f"下载完成，编号：{album_id}，页数：{page_text}，密码：{album_id}"
+        )
+
+        await self._send_zip_or_path(event, result)
+
+    def _build_config(self) -> JMDownloadConfig:
+        base_dir = _get_config_value(
+            self.config,
+            "base_dir",
+            str(Path(get_astrbot_data_path()) / "jm_downloads"),
+        ) or str(Path(get_astrbot_data_path()) / "jm_downloads")
+        return JMDownloadConfig(
+            base_dir=Path(str(base_dir)).expanduser().resolve(),
+            client_impl=str(_get_config_value(self.config, "client_impl", "html")),
+            domain=str(_get_config_value(self.config, "domain", "18comic.vip")),
+            proxy=str(_get_config_value(self.config, "proxy", "system")),
+            avs_cookie=str(_get_config_value(self.config, "avs_cookie", "")),
+            image_threads=int(_get_config_value(self.config, "image_threads", 8)),
+            cleanup_images=bool(_get_config_value(self.config, "cleanup_images", True)),
+            keep_zip=bool(_get_config_value(self.config, "keep_zip", True)),
+        )
+
+    async def _send_zip_or_path(
+        self,
+        event: AstrMessageEvent,
+        result: JMDownloadResult,
+    ) -> None:
+        try:
+            await event.send(
+                MessageChain(
+                    chain=[
+                        File(
+                            name=result.zip_path.name,
+                            file=str(result.zip_path),
+                        )
+                    ]
+                )
+            )
+        except Exception:
+            logger.exception("JM zip 文件发送失败: %s", result.zip_path)
+            await event.send(
+                MessageChain().message(
+                    f"文件发送失败，请在服务器本地获取：{result.zip_path}"
+                )
+            )
+            return
+
+        if not self._build_config().keep_zip:
+            cleanup_zip(result.zip_path)
 
     async def terminate(self):
-        """可选择实现异步的插件销毁方法，当插件被卸载/停用时会调用。"""
+        pass
+
+
+def _get_config_value(config: Any, key: str, default: Any) -> Any:
+    if hasattr(config, "get"):
+        value = config.get(key, default)
+        return default if value is None else value
+    return default
+
+
+def _summarize_error(exc: Exception) -> str:
+    message = str(exc).strip().splitlines()[0] if str(exc).strip() else exc.__class__.__name__
+    return message[:180]
