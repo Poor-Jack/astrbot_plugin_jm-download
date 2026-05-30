@@ -32,9 +32,11 @@ class JMDownloadResult:
 
 def parse_jm_command(message: str) -> tuple[str | None, str | None]:
     parts = message.strip().split()
-    if len(parts) != 2 or parts[0] != "/jm" or not parts[1].isdigit():
-        return None, FORMAT_ERROR
-    return parts[1], None
+    if len(parts) == 1 and parts[0].isdigit():
+        return parts[0], None
+    if len(parts) == 2 and parts[0] in {"/jm", "jm"} and parts[1].isdigit():
+        return parts[1], None
+    return None, FORMAT_ERROR
 
 
 def download_album_as_zip(album_id: str, config: JMDownloadConfig) -> JMDownloadResult:
