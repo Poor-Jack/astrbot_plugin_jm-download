@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import Any
 
 from astrbot.api import AstrBotConfig, logger
-from astrbot.api.event import AstrMessageEvent, MessageChain, filter
+from astrbot.api.event import AstrMessageEvent, filter
 from astrbot.api.message_components import File
 from astrbot.api.star import Context, Star, register
 from astrbot.core.utils.astrbot_path import get_astrbot_data_path
@@ -14,7 +14,6 @@ try:
     from .jm_download_core import (
         FORMAT_ERROR,
         JMDownloadConfig,
-        JMDownloadResult,
         cleanup_zip,
         download_album_as_zip,
         parse_jm_command,
@@ -23,7 +22,6 @@ except ImportError:
     from jm_download_core import (
         FORMAT_ERROR,
         JMDownloadConfig,
-        JMDownloadResult,
         cleanup_zip,
         download_album_as_zip,
         parse_jm_command,
@@ -67,7 +65,17 @@ class JMDownloadPlugin(Star):
             f"下载完成，编号：{album_id}，页数：{page_text}，密码：{album_id}"
         )
 
-        await self._send_zip_or_path(event, result)
+        yield event.chain_result(
+            [
+                File(
+                    name=result.zip_path.name,
+                    file=str(result.zip_path),
+                )
+            ]
+        )
+
+        if not self._build_config().keep_zip:
+            cleanup_zip(result.zip_path)
 
     def _build_config(self) -> JMDownloadConfig:
         base_dir = _get_config_value(
@@ -85,34 +93,6 @@ class JMDownloadPlugin(Star):
             cleanup_images=bool(_get_config_value(self.config, "cleanup_images", True)),
             keep_zip=bool(_get_config_value(self.config, "keep_zip", True)),
         )
-
-    async def _send_zip_or_path(
-        self,
-        event: AstrMessageEvent,
-        result: JMDownloadResult,
-    ) -> None:
-        try:
-            await event.send(
-                MessageChain(
-                    chain=[
-                        File(
-                            name=result.zip_path.name,
-                            file=str(result.zip_path),
-                        )
-                    ]
-                )
-            )
-        except Exception:
-            logger.exception("JM zip 文件发送失败: %s", result.zip_path)
-            await event.send(
-                MessageChain().message(
-                    f"文件发送失败，请在服务器本地获取：{result.zip_path}"
-                )
-            )
-            return
-
-        if not self._build_config().keep_zip:
-            cleanup_zip(result.zip_path)
 
     async def terminate(self):
         pass
