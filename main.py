@@ -89,7 +89,7 @@ class JMDownloadPlugin(Star):
             domain=str(_get_config_value(self.config, "domain", "18comic.vip")),
             proxy=str(_get_config_value(self.config, "proxy", "system")),
             avs_cookie=str(_get_config_value(self.config, "avs_cookie", "")),
-            image_threads=int(_get_config_value(self.config, "image_threads", 8)),
+            image_threads=int(_get_config_value(self.config, "image_threads", 2)),
             cleanup_images=bool(_get_config_value(self.config, "cleanup_images", True)),
             keep_zip=bool(_get_config_value(self.config, "keep_zip", True)),
         )

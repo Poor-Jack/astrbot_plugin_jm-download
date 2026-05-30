@@ -35,7 +35,7 @@ AstrBot 通常会在加载插件时自动安装依赖；如果自动安装失败
 - `domain`：JM 域名，默认 `18comic.vip`。
 - `proxy`：代理地址。`system`、`none` 或空值表示不显式配置代理。
 - `avs_cookie`：可选 AVS Cookie。
-- `image_threads`：图片下载线程数，默认 `8`。
+- `image_threads`：图片下载线程数，默认 `2`，适合 1GB 内存左右的小服务器。
 - `cleanup_images`：生成 PDF 后清理图片目录，默认开启。
 - `keep_zip`：发送后保留 zip，默认开启。
 

@@ -28,7 +28,7 @@
   "image_threads": {
     "description": "图片下载线程数",
     "type": "int",
-    "default": 8
+    "default": 2
   },
   "cleanup_images": {
     "description": "生成 PDF 后清理图片目录",

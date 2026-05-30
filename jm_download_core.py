@@ -17,7 +17,7 @@ class JMDownloadConfig:
     domain: str = "18comic.vip"
     proxy: str = "system"
     avs_cookie: str = ""
-    image_threads: int = 8
+    image_threads: int = 2
     cleanup_images: bool = True
     keep_zip: bool = True
 
@@ -83,7 +83,7 @@ def create_pdf(image_paths: list[Path], pdf_path: Path) -> None:
 
     pdf_path.parent.mkdir(parents=True, exist_ok=True)
     with pdf_path.open("wb") as fp:
-        fp.write(img2pdf.convert([str(path) for path in image_paths]))
+        img2pdf.convert([str(path) for path in image_paths], outputstream=fp)
 
 
 def create_password_zip(pdf_path: Path, zip_path: Path, password: str) -> None:
@@ -93,7 +93,7 @@ def create_password_zip(pdf_path: Path, zip_path: Path, password: str) -> None:
     with pyzipper.AESZipFile(
         zip_path,
         "w",
-        compression=pyzipper.ZIP_DEFLATED,
+        compression=pyzipper.ZIP_STORED,
         encryption=pyzipper.WZ_AES,
     ) as zf:
         zf.setpassword(password.encode("utf-8"))
