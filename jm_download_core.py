@@ -17,7 +17,7 @@ class JMDownloadConfig:
     domain: str = "18comic.vip"
     proxy: str = "system"
     avs_cookie: str = ""
-    image_threads: int = 2
+    image_threads: int = 1
     cleanup_images: bool = True
     keep_zip: bool = True
 
@@ -28,6 +28,32 @@ class JMDownloadResult:
     page_count: int | None
     pdf_path: Path
     zip_path: Path
+
+
+def coerce_bool(value: Any, default: bool = False) -> bool:
+    if value is None:
+        return default
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, (int, float)):
+        return value != 0
+
+    normalized = str(value).strip().lower()
+    if normalized in {"1", "true", "yes", "y", "on"}:
+        return True
+    if normalized in {"", "0", "false", "no", "n", "off", "none", "null"}:
+        return False
+    return default
+
+
+def coerce_int(value: Any, default: int, minimum: int | None = None) -> int:
+    try:
+        result = int(value)
+    except (TypeError, ValueError):
+        result = default
+    if minimum is not None:
+        result = max(minimum, result)
+    return result
 
 
 def parse_jm_command(message: str) -> tuple[str | None, str | None]:
@@ -123,7 +149,7 @@ def _build_jm_option(config: JMDownloadConfig, image_dir: Path) -> Any:
                 "suffix": None,
             },
             "threading": {
-                "image": max(1, int(config.image_threads)),
+                "image": coerce_int(config.image_threads, default=1, minimum=1),
                 "photo": 1,
             },
         },

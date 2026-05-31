@@ -6,7 +6,14 @@ from pathlib import Path
 from unittest.mock import patch
 
 
-from jm_download_core import FORMAT_ERROR, create_password_zip, create_pdf, parse_jm_command
+from jm_download_core import (
+    FORMAT_ERROR,
+    coerce_bool,
+    coerce_int,
+    create_password_zip,
+    create_pdf,
+    parse_jm_command,
+)
 
 
 class ParseJmCommandTest(unittest.TestCase):
@@ -105,6 +112,26 @@ class LowMemoryPackagingTest(unittest.TestCase):
         self.assertEqual(opened[0]["encryption"], fake_pyzipper.WZ_AES)
         self.assertEqual(opened[0]["password"], b"150263")
         self.assertEqual(opened[0]["written"], (pdf_path, "150263.pdf"))
+
+
+class ConfigCoercionTest(unittest.TestCase):
+    def test_coerce_bool_handles_webui_string_values(self):
+        for value in ("false", "False", "0", "no", "off", ""):
+            with self.subTest(value=value):
+                self.assertFalse(coerce_bool(value, default=True))
+
+        for value in ("true", "True", "1", "yes", "on"):
+            with self.subTest(value=value):
+                self.assertTrue(coerce_bool(value, default=False))
+
+    def test_coerce_bool_falls_back_for_unknown_values(self):
+        self.assertTrue(coerce_bool("maybe", default=True))
+        self.assertFalse(coerce_bool(None, default=False))
+
+    def test_coerce_int_handles_strings_and_minimum(self):
+        self.assertEqual(coerce_int("3", default=1, minimum=1), 3)
+        self.assertEqual(coerce_int("0", default=2, minimum=1), 1)
+        self.assertEqual(coerce_int("bad", default=2, minimum=1), 2)
 
 
 if __name__ == "__main__":

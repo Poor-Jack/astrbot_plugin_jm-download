@@ -26,14 +26,25 @@
     "default": ""
   },
   "image_threads": {
-    "description": "图片下载线程数",
+    "description": "图片下载线程数；1GB 内存服务器建议保持 1",
     "type": "int",
-    "default": 2
+    "default": 1
   },
   "cleanup_images": {
     "description": "生成 PDF 后清理图片目录",
     "type": "bool",
     "default": true
+  },
+  "delivery_mode": {
+    "description": "zip 投递方式；link 为低内存下载链接，path 只回复本地路径，file 使用平台文件消息",
+    "type": "string",
+    "default": "link",
+    "options": ["link", "path", "file"]
+  },
+  "file_link_ttl": {
+    "description": "低内存下载链接有效期，单位秒",
+    "type": "int",
+    "default": 3600
   },
   "keep_zip": {
     "description": "发送后保留 zip 文件",

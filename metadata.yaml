@@ -1,6 +1,6 @@
 name: astrbot_plugin_jm_download
 display_name: JM 下载
-desc: 使用 /jm [num] 下载 JM album，生成 PDF 后以同编号密码打包 zip 发送。
-version: v1.0.0
+desc: 使用 /jm [num] 下载 JM album，生成 PDF 后以同编号密码打包 zip。
+version: 1.0.0
 author: poorjack
 repo: ""
