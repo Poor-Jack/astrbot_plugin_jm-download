@@ -1,6 +1,6 @@
 # astrbot_plugin_jm_download
 
-AstrBot JM 下载插件。发送 `/jm [num]` 后，插件会调用 `jmcomic` 下载指定 album，合成为 PDF，用编号作为密码打包为 zip。默认回复 AstrBot 文件服务下载链接，避免小内存服务器在平台文件上传阶段被 OOM 杀掉。
+AstrBot JM 下载插件。发送 `/jm [num]` 后，插件会调用 `jmcomic` 下载指定 album，合成为 PDF，用编号作为密码打包为 zip。默认在 QQ/OneBot 中直接上传 zip 文件；如果不是 QQ 事件或上传失败，会降级为 AstrBot 文件服务下载链接或本地路径。
 
 ## 用法
 
@@ -37,7 +37,7 @@ AstrBot 通常会在加载插件时自动安装依赖；如果自动安装失败
 - `avs_cookie`：可选 AVS Cookie。
 - `image_threads`：图片下载线程数，默认 `1`，适合 1GB 内存左右的小服务器。
 - `cleanup_images`：生成 PDF 后清理图片目录，默认开启。
-- `delivery_mode`：zip 投递方式，默认 `link`。`link` 会发送 AstrBot 文件服务下载链接，`path` 只回复服务器本地路径，`file` 使用平台文件消息。
+- `delivery_mode`：zip 投递方式，默认 `qq_file`。`qq_file` 会调用 QQ/OneBot 的 `upload_group_file` 或 `upload_private_file` 上传 zip；`link` 会发送 AstrBot 文件服务下载链接，如果没有配置 `callback_api_base` 且当前是 QQ 事件，会自动降级为 QQ 文件上传；`path` 只回复服务器本地路径；`file` 使用平台文件消息。
 - `file_link_ttl`：`delivery_mode=link` 时下载链接有效期，默认 `3600` 秒。
 - `keep_zip`：发送后保留 zip，默认开启。
 
@@ -45,7 +45,7 @@ AstrBot 通常会在加载插件时自动安装依赖；如果自动安装失败
 
 ## 平台限制
 
-不同平台适配器对文件消息支持不一致，并且部分平台上传文件时会把整个 zip 读入内存。1GB 内存左右的小服务器建议保持默认 `delivery_mode=link`，并在 AstrBot 主配置中设置可访问的 `callback_api_base`。如果不配置 `callback_api_base`，插件会回复服务器本地 zip 路径。
+不同平台适配器对文件消息支持不一致，并且部分平台上传文件时会把整个 zip 读入内存。QQ/OneBot 建议保持默认 `delivery_mode=qq_file`，这会绕过 AstrBot 文件消息组件，并按顺序尝试普通本地路径、`file://` 路径、AstrBot 文件服务 URL。如果协议端和 AstrBot 不在同一文件系统内，建议在 AstrBot 主配置中设置可访问的 `callback_api_base`，让 URL 候选也可用。
 
 ## 合规提醒
 

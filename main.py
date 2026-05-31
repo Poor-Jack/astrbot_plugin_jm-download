@@ -15,6 +15,8 @@ try:
     from .jm_download_core import (
         FORMAT_ERROR,
         JMDownloadConfig,
+        build_onebot_upload_file_actions,
+        build_qq_upload_file_refs,
         cleanup_zip,
         coerce_bool,
         coerce_int,
@@ -25,6 +27,8 @@ except ImportError:
     from jm_download_core import (
         FORMAT_ERROR,
         JMDownloadConfig,
+        build_onebot_upload_file_actions,
+        build_qq_upload_file_refs,
         cleanup_zip,
         coerce_bool,
         coerce_int,
@@ -71,7 +75,7 @@ class JMDownloadPlugin(Star):
         )
 
         delivery_mode = str(
-            _get_config_value(self.config, "delivery_mode", "link")
+            _get_config_value(self.config, "delivery_mode", "qq_file")
         ).strip().lower()
         if delivery_mode == "file":
             yield event.chain_result(
@@ -83,6 +87,17 @@ class JMDownloadPlugin(Star):
                 ]
             )
         else:
+            if delivery_mode == "qq_file" or (
+                delivery_mode == "link" and not _get_callback_host()
+            ):
+                sent, error = await self._send_qq_file(event, result.zip_path)
+                if sent:
+                    yield event.plain_result(f"zip 已发送到 QQ，文件名：{result.zip_path.name}")
+                    if not self._build_config().keep_zip:
+                        cleanup_zip(result.zip_path)
+                    return
+                logger.warning("QQ 文件上传不可用，降级为下载链接: %s", error)
+
             yield event.plain_result(
                 await self._build_download_message(result.zip_path, delivery_mode)
             )
@@ -121,7 +136,7 @@ class JMDownloadPlugin(Star):
         if delivery_mode == "path":
             return f"zip 已生成，请在服务器本地获取：{zip_path}"
 
-        callback_host = str(astrbot_config.get("callback_api_base", "")).rstrip("/")
+        callback_host = _get_callback_host()
         if callback_host:
             ttl = coerce_int(
                 _get_config_value(self.config, "file_link_ttl", 3600),
@@ -140,6 +155,62 @@ class JMDownloadPlugin(Star):
             f"请在服务器本地获取：{zip_path}"
         )
 
+    async def _send_qq_file(
+        self,
+        event: AstrMessageEvent,
+        zip_path: Path,
+    ) -> tuple[bool, str]:
+        bot = getattr(event, "bot", None)
+        if bot is None or not hasattr(bot, "call_action"):
+            return False, "当前事件不是 aiocqhttp/OneBot QQ 事件"
+
+        group_id = event.get_group_id()
+        is_group = bool(group_id)
+        target_id = group_id if is_group else event.get_sender_id()
+        upload_url = await self._register_file_url(zip_path)
+        file_refs = build_qq_upload_file_refs(zip_path, upload_url)
+        errors = []
+
+        try:
+            actions = build_onebot_upload_file_actions(
+                is_group=is_group,
+                target_id=target_id,
+                file_refs=file_refs,
+                file_name=zip_path.name,
+            )
+        except Exception as exc:
+            return False, _summarize_error(exc)
+
+        for action, payload in actions:
+            try:
+                await bot.call_action(action, **payload)
+                logger.info("QQ 文件上传成功: %s via %s", zip_path, payload["file"])
+                return True, ""
+            except Exception as exc:
+                summary = _summarize_error(exc)
+                errors.append(f"{payload['file']}: {summary}")
+                logger.warning(
+                    "QQ 文件上传候选失败: %s via %s: %s",
+                    zip_path,
+                    payload["file"],
+                    summary,
+                )
+
+        return False, "；".join(errors) if errors else "没有可用的 QQ 文件上传候选"
+
+    async def _register_file_url(self, zip_path: Path) -> str | None:
+        callback_host = _get_callback_host()
+        if not callback_host:
+            return None
+
+        ttl = coerce_int(
+            _get_config_value(self.config, "file_link_ttl", 3600),
+            default=3600,
+            minimum=60,
+        )
+        token = await file_token_service.register_file(str(zip_path), timeout=ttl)
+        return f"{callback_host}/api/file/{token}"
+
     async def terminate(self):
         pass
 
@@ -149,6 +220,10 @@ def _get_config_value(config: Any, key: str, default: Any) -> Any:
         value = config.get(key, default)
         return default if value is None else value
     return default
+
+
+def _get_callback_host() -> str:
+    return str(astrbot_config.get("callback_api_base", "")).rstrip("/")
 
 
 def _summarize_error(exc: Exception) -> str:

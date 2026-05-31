@@ -36,10 +36,10 @@
     "default": true
   },
   "delivery_mode": {
-    "description": "zip 投递方式；link 为低内存下载链接，path 只回复本地路径，file 使用平台文件消息",
+    "description": "zip 投递方式；qq_file 为 QQ OneBot 文件上传，link 为低内存下载链接，path 只回复本地路径，file 使用平台文件消息",
     "type": "string",
-    "default": "link",
-    "options": ["link", "path", "file"]
+    "default": "qq_file",
+    "options": ["qq_file", "link", "path", "file"]
   },
   "file_link_ttl": {
     "description": "低内存下载链接有效期，单位秒",

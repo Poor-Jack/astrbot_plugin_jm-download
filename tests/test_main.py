@@ -8,6 +8,9 @@ from unittest.mock import patch
 
 from jm_download_core import (
     FORMAT_ERROR,
+    build_onebot_upload_file_action,
+    build_onebot_upload_file_actions,
+    build_qq_upload_file_refs,
     coerce_bool,
     coerce_int,
     create_password_zip,
@@ -132,6 +135,90 @@ class ConfigCoercionTest(unittest.TestCase):
         self.assertEqual(coerce_int("3", default=1, minimum=1), 3)
         self.assertEqual(coerce_int("0", default=2, minimum=1), 1)
         self.assertEqual(coerce_int("bad", default=2, minimum=1), 2)
+
+
+class OneBotUploadActionTest(unittest.TestCase):
+    def test_builds_group_upload_action(self):
+        action, payload = build_onebot_upload_file_action(
+            is_group=True,
+            target_id="123456",
+            file_path=Path("/tmp/150263.zip"),
+            file_name="150263.zip",
+        )
+
+        self.assertEqual(action, "upload_group_file")
+        self.assertEqual(
+            payload,
+            {
+                "group_id": 123456,
+                "file": "/tmp/150263.zip",
+                "name": "150263.zip",
+            },
+        )
+
+    def test_builds_private_upload_action(self):
+        action, payload = build_onebot_upload_file_action(
+            is_group=False,
+            target_id="987654",
+            file_path=Path("/tmp/150263.zip"),
+            file_name="150263.zip",
+        )
+
+        self.assertEqual(action, "upload_private_file")
+        self.assertEqual(
+            payload,
+            {
+                "user_id": 987654,
+                "file": "/tmp/150263.zip",
+                "name": "150263.zip",
+            },
+        )
+
+    def test_rejects_non_numeric_target_id(self):
+        with self.assertRaises(ValueError):
+            build_onebot_upload_file_action(
+                is_group=True,
+                target_id="not-a-number",
+                file_path=Path("/tmp/150263.zip"),
+                file_name="150263.zip",
+            )
+
+    def test_builds_upload_actions_for_multiple_file_refs(self):
+        actions = build_onebot_upload_file_actions(
+            is_group=True,
+            target_id="123456",
+            file_refs=[
+                "/tmp/150263.zip",
+                "file:///tmp/150263.zip",
+                "http://127.0.0.1:6185/api/file/token",
+            ],
+            file_name="150263.zip",
+        )
+
+        self.assertEqual([action for action, _payload in actions], ["upload_group_file"] * 3)
+        self.assertEqual(
+            [payload["file"] for _action, payload in actions],
+            [
+                "/tmp/150263.zip",
+                "file:///tmp/150263.zip",
+                "http://127.0.0.1:6185/api/file/token",
+            ],
+        )
+
+    def test_builds_qq_upload_file_refs_with_local_and_url_candidates(self):
+        refs = build_qq_upload_file_refs(
+            Path("/tmp/150263.zip"),
+            callback_url="http://127.0.0.1:6185/api/file/token",
+        )
+
+        self.assertEqual(
+            refs,
+            [
+                "/tmp/150263.zip",
+                "file:///tmp/150263.zip",
+                "http://127.0.0.1:6185/api/file/token",
+            ],
+        )
 
 
 if __name__ == "__main__":

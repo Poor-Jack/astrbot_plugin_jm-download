@@ -56,6 +56,68 @@ def coerce_int(value: Any, default: int, minimum: int | None = None) -> int:
     return result
 
 
+def build_onebot_upload_file_action(
+    is_group: bool,
+    target_id: str,
+    file_path: Path,
+    file_name: str,
+) -> tuple[str, dict[str, Any]]:
+    return build_onebot_upload_file_actions(
+        is_group=is_group,
+        target_id=target_id,
+        file_refs=[str(file_path)],
+        file_name=file_name,
+    )[0]
+
+
+def build_onebot_upload_file_actions(
+    is_group: bool,
+    target_id: str,
+    file_refs: list[str],
+    file_name: str,
+) -> list[tuple[str, dict[str, Any]]]:
+    if not str(target_id).isdigit():
+        raise ValueError("QQ 会话 ID 不是纯数字，无法上传文件")
+
+    action = "upload_group_file" if is_group else "upload_private_file"
+    target_key = "group_id" if is_group else "user_id"
+    target_value = int(target_id)
+    actions = []
+    for file_ref in file_refs:
+        actions.append(
+            (
+                action,
+                {
+                    target_key: target_value,
+                    "file": file_ref,
+                    "name": file_name,
+                },
+            )
+        )
+    if not actions:
+        raise ValueError("没有可用的 QQ 文件上传路径")
+    return actions
+
+
+def build_qq_upload_file_refs(
+    zip_path: Path,
+    callback_url: str | None = None,
+) -> list[str]:
+    refs = [str(zip_path)]
+    try:
+        refs.append(zip_path.resolve().as_uri())
+    except ValueError:
+        pass
+    if callback_url:
+        refs.append(callback_url)
+
+    unique_refs = []
+    for ref in refs:
+        if ref and ref not in unique_refs:
+            unique_refs.append(ref)
+    return unique_refs
+
+
 def parse_jm_command(message: str) -> tuple[str | None, str | None]:
     parts = message.strip().split()
     if len(parts) == 1 and parts[0].isdigit():
